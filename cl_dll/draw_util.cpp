@@ -358,6 +358,141 @@ void DrawUtils::Draw2DQuad( float x1, float y1, float x2, float y2 )
 
 }
 
+/*
+ * DrawScaledString: Draw text at Nx scale using pfnDrawCharacter.
+ *
+ * Renders each character multiple times in an NxN grid to create
+ * a visually larger, bolder text. The spacing between characters
+ * is also multiplied by the scale factor.
+ *
+ * scale=1: normal size
+ * scale=2: 2x size (each char rendered as 2x2 block)
+ * scale=3: 3x size
+ */
+int DrawUtils::DrawScaledString( int x, int y, int iMaxX, const char *str,
+                                  int r, int g, int b, float scale )
+{
+	if( scale < 1.0f ) scale = 1.0f;
+
+	Con_UtfProcessChar( 0 );
+
+	for( ; *str != 0 && *str != '\n'; str++ )
+	{
+		if( *str == '\\' && *(str + 1) != '\n' && *(str + 1) != 0 )
+		{
+			str++;
+			continue;
+		}
+		if( *str == '^' && isdigit( *(str + 1) ) )
+		{
+			str++;
+			if( gHUD.hud_colored->value )
+			{
+				r = g_color_table[ColorIndex( *str )][0];
+				g = g_color_table[ColorIndex( *str )][1];
+				b = g_color_table[ColorIndex( *str )][2];
+			}
+			continue;
+		}
+
+		int uch = Con_UtfProcessChar( (unsigned char)*str );
+		int charW = (int)( gHUD.GetCharWidth( uch ) * scale );
+
+		if( x + charW > iMaxX )
+			return x;
+
+		if( g_iMobileAPIVersion && scale > 1.0f )
+		{
+			int w = gMobileAPI.pfnDrawScaledCharacter( x, y, (unsigned char)*str, r, g, b, scale );
+			x += w / gHUD.m_flScale;
+		}
+		else
+		{
+			gEngfuncs.pfnDrawCharacter( x, y, (unsigned char)*str, r, g, b );
+			x += charW;
+		}
+	}
+
+	return x;
+}
+
+int DrawUtils::ScaledStringLen( const char *szIt, float scale )
+{
+	if( scale < 1.0f ) scale = 1.0f;
+	int l = 0;
+
+	Con_UtfProcessChar( 0 );
+
+	for( ; *szIt != 0 && *szIt != '\n'; szIt++ )
+	{
+		if( szIt[0] == '\\' && szIt[1] != '\n' &&
+			(szIt[1] == 'y' || szIt[1] == 'w' || szIt[1] == 'd' || szIt[1] == 'R') )
+		{
+			szIt++;
+			continue;
+		}
+		if( szIt[0] == '^' && isdigit( szIt[1] ) )
+		{
+			szIt++;
+			continue;
+		}
+
+		int uch = Con_UtfProcessChar( (unsigned char)*szIt );
+		if( !uch ) continue;
+
+		l += (int)( gHUD.GetCharWidth( uch ) * scale );
+	}
+
+	return l;
+}
+
+/*
+ * DrawScaledHudNumber: Draw HUD numbers using pfnDrawScaledCharacter.
+ *
+ * Uses the engine's scaled character renderer to draw digit characters
+ * at arbitrary scale. This replaces sprite-based numbers with scaled
+ * text characters for the CSO HUD.
+ */
+int DrawUtils::DrawScaledHudNumber( int x, int y, int iFlags, int iNumber,
+                                     int r, int g, int b, float scale )
+{
+	// Use pfnDrawScaledCharacter if available
+	if( !g_iMobileAPIVersion || scale <= 1.0f )
+		return DrawHudNumber( x, y, iFlags, iNumber, r, g, b );
+
+	char buf[16];
+	int digits = 0;
+
+	if( iNumber > 0 || (iFlags & DHN_DRAWZERO) )
+	{
+		if( iFlags & DHN_3DIGITS )
+			snprintf( buf, sizeof(buf), "%3d", iNumber );
+		else if( iFlags & DHN_2DIGITS )
+			snprintf( buf, sizeof(buf), "%2d", iNumber );
+		else
+			snprintf( buf, sizeof(buf), "%d", iNumber );
+	}
+	else
+	{
+		buf[0] = 0;
+	}
+
+	for( int i = 0; buf[i]; i++ )
+	{
+		if( buf[i] == ' ' )
+		{
+			// Space — advance by scaled char width
+			int w = gMobileAPI.pfnDrawScaledCharacter( x, y, '0', 0, 0, 0, scale );
+			x += w / gHUD.m_flScale;
+			continue;
+		}
+		int w = gMobileAPI.pfnDrawScaledCharacter( x, y, buf[i], r, g, b, scale );
+		x += w / gHUD.m_flScale;
+	}
+
+	return x;
+}
+
 int DrawUtils::HudStringLen( const char *szIt, float scale )
 {
 	int l;

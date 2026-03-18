@@ -188,6 +188,15 @@ public:
 	static void DrawStretchPic( float x, float y, float w, float h,
 								float s1 = 0, float t1 = 0, float s2 = 1, float t2 = 1);
 
+	// CSO HUD: Scaled text drawing for chat
+	static int DrawScaledString( int x, int y, int iMaxX, const char *string,
+								 int r, int g, int b, float scale = 2.0f );
+	static int ScaledStringLen( const char *string, float scale = 2.0f );
+
+	// CSO HUD: Scaled HUD number drawing (uses pfnDrawScaledCharacter)
+	static int DrawScaledHudNumber( int x, int y, int iFlags, int iNumber,
+	                                int r, int g, int b, float scale = 1.5f );
+
 
 private:
 	// console string color

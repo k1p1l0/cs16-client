@@ -132,27 +132,26 @@ int CHudSayText :: Draw( float flTime )
 				activeLines++;
 		}
 
-		// Calculate actual line height used for drawing
-		int chatLineH = line_height + 4;
+		int chatLineH = (int)(line_height * 2.5f) + 4;
 
 		if( activeLines > 0 )
 		{
-			// Calculate max text width across all lines for tight background
+			// Calculate max text width using scaled measurement
 			int maxTextW = 0;
 			for( int j = 0; j < MAX_LINES; j++ )
 			{
 				if( g_szLineBuffer[j][0] )
 				{
-					int tw = DrawUtils::ConsoleStringLen( g_szLineBuffer[j] );
+					int tw = DrawUtils::ScaledStringLen( g_szLineBuffer[j], 2.5f );
 					if( tw > maxTextW ) maxTextW = tw;
 				}
 			}
 
 			int bgX = 0;
-			int bgY = y - 6;
-			int bgW = maxTextW + 30;  // tight to text width + padding
-			if( bgW > ScreenWidth / 2 ) bgW = ScreenWidth / 2;  // cap at half screen
-			int bgH = activeLines * chatLineH + 12;
+			int bgY = y - 8;
+			int bgW = maxTextW + 40;
+			if( bgW > ScreenWidth * 2 / 3 ) bgW = ScreenWidth * 2 / 3;
+			int bgH = activeLines * chatLineH + 16;
 			// Dark solid background
 			FillRGBA( bgX, bgY, bgW, bgH, 5, 5, 10, 210 );
 			// Left accent bar
@@ -160,16 +159,26 @@ int CHudSayText :: Draw( float flTime )
 		}
 	}
 
+	// CSO HUD: use 2x scaled custom renderer
+	bool csoChat = ( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 );
+	int chatScale = csoChat ? 2 : 1;
+	float chatScaleF = csoChat ? 2.5f : 1.0f;
+
 	for (int i = 0; i < MAX_LINES; i++)
 	{
 		if (!g_szLineBuffer[i][0]) // skip empty string
 			continue;
 
-		int current_x = ( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 ) ? 15 : LINE_START;
+		int current_x = csoChat ? 15 : LINE_START;
 		const char* text = g_szLineBuffer[i];
 		size_t length = strlen(text);
 
-		// default color if not set
+		// Current color (default yellow)
+		int curR = (int)(g_ColorYellow[0] * 255);
+		int curG = (int)(g_ColorYellow[1] * 255);
+		int curB = (int)(g_ColorYellow[2] * 255);
+
+		// Also set for non-CSO path
 		DrawUtils::SetConsoleTextColor(g_ColorYellow[0], g_ColorYellow[1], g_ColorYellow[2]);
 
 		// buffer for accumulating characters of the same color
@@ -179,54 +188,65 @@ int CHudSayText :: Draw( float flTime )
 		for (size_t c = 0; c < length; c++)
 		{
 			// color code parse
-			// '\x01' - normal (yellow); '\0x03' - teamcolor (R GREY B); '\x04' - green
 			if (text[c] == '\x01' || text[c] == '\x03' || text[c] == '\x04')
 			{
-				// if there are characters in the buffer, we draw them with the current color
+				// flush buffer with current color
 				if (buffer_pos > 0)
 				{
 					color_buffer[buffer_pos] = '\x00';
-					current_x = DrawUtils::DrawConsoleString(current_x, y, color_buffer);
+					if( csoChat )
+						current_x = DrawUtils::DrawScaledString( current_x, y, ScreenWidth, color_buffer, curR, curG, curB, chatScaleF );
+					else
+						current_x = DrawUtils::DrawConsoleString(current_x, y, color_buffer);
 					buffer_pos = 0;
 				}
 
-				// switch to color code
-				char color_code = text[c];
-				switch (color_code)
+				// switch color
+				switch (text[c])
 				{
 					case '\x01': // yellow normal
+						curR = (int)(g_ColorYellow[0] * 255);
+						curG = (int)(g_ColorYellow[1] * 255);
+						curB = (int)(g_ColorYellow[2] * 255);
 						DrawUtils::SetConsoleTextColor(g_ColorYellow[0], g_ColorYellow[1], g_ColorYellow[2]);
 						break;
 					case '\x03': // team color
 						if (g_pflNameColors[i])
 						{
+							curR = (int)(g_pflNameColors[i][0] * 255);
+							curG = (int)(g_pflNameColors[i][1] * 255);
+							curB = (int)(g_pflNameColors[i][2] * 255);
 							DrawUtils::SetConsoleTextColor(g_pflNameColors[i][0], g_pflNameColors[i][1], g_pflNameColors[i][2]);
 						}
 						break;
 					case '\x04': // green
+						curR = (int)(g_ColorGreen[0] * 255);
+						curG = (int)(g_ColorGreen[1] * 255);
+						curB = (int)(g_ColorGreen[2] * 255);
 						DrawUtils::SetConsoleTextColor(g_ColorGreen[0], g_ColorGreen[1], g_ColorGreen[2]);
 						break;
 				}
 				continue;
 			}
 
-			// add char to buf
 			if (buffer_pos < sizeof(color_buffer) - 1)
 			{
 				color_buffer[buffer_pos++] = text[c];
 			}
 		}
 
-		// draw the remaining characters
+		// draw remaining
 		if (buffer_pos > 0)
 		{
 			color_buffer[buffer_pos] = '\x00';
-			DrawUtils::DrawConsoleString(current_x, y, color_buffer);
+			if( csoChat )
+				current_x = DrawUtils::DrawScaledString( current_x, y, ScreenWidth, color_buffer, curR, curG, curB, chatScale );
+			else
+				DrawUtils::DrawConsoleString(current_x, y, color_buffer);
 		}
 
-		// CSO HUD: slightly more line spacing
-		if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
-			y += line_height + 4;
+		if( csoChat )
+			y += (int)(line_height * 2.5f) + 4;
 		else
 			y += line_height;
 	}
@@ -481,13 +501,19 @@ void CHudSayText :: SayTextPrint( const char *pszBuf, int iBufSize, int clientIn
 
 	if( !g_iUser1 )
 	{
-		Y_START = ScreenHeight - 60;
+		// CSO HUD: move chat higher to avoid overlap with HP/armor bars
+		if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+			Y_START = ScreenHeight - 120;
+		else
+			Y_START = ScreenHeight - 60;
 	}
 	else
 	{
 		Y_START = ScreenHeight * 4 / 5;
 	}
-	Y_START -= (line_height * (MAX_LINES+1));
+
+	int chatLineH = ( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 ) ? (int)(line_height * 2.5f) + 4 : line_height;
+	Y_START -= (chatLineH * (MAX_LINES+1));
 
 }
 

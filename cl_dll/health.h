@@ -127,6 +127,7 @@ private:
 	void DrawPain( float fTime );
 	void DrawDamage( float fTime );
 	void DrawHealthBar( float flTime );
+	void DrawCSO_HealthBar( float flTime );
 	void CalcDamageDirection( Vector vecFrom );
 	void UpdateTiles( float fTime, long bits );
 

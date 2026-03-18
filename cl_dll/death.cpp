@@ -36,6 +36,7 @@ struct DeathNoticeItem {
 	float *KillerColor;
 	float *VictimColor;
 	int iHeadShotId;
+	int iDrawBg;  // CSO: 0=none, 1=green(you killed), 2=red(you died)
 };
 
 #define MAX_DEATHNOTICES	4
@@ -53,6 +54,10 @@ int CHudDeathNotice :: Init( void )
 
 	hud_deathnotice_time = CVAR_CREATE( "hud_deathnotice_time", "6", FCVAR_ARCHIVE );
 	m_iFlags = 0;
+	m_iKillStreak = 0;
+	m_flLastKillTime = 0;
+	m_flStreakDisplayTime = 0;
+	m_szStreakText[0] = 0;
 
 	return 1;
 }
@@ -106,6 +111,33 @@ int CHudDeathNotice :: Draw( float flTime )
 			}
 
 			int id = (rgDeathNoticeList[i].iId == -1) ? m_HUD_d_skull : rgDeathNoticeList[i].iId;
+
+			// CSO HUD: Draw background rectangle behind kill feed entry
+			if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+			{
+				int bgPadX = 6;
+				int bgPadY = 2;
+				int killerLen = rgDeathNoticeList[i].bSuicide ? 0 : DrawUtils::ConsoleStringLen( rgDeathNoticeList[i].szKiller );
+				int victimLen = DrawUtils::ConsoleStringLen( rgDeathNoticeList[i].szVictim );
+				int spriteWidth = gHUD.GetSpriteRect(id).Width();
+				if( rgDeathNoticeList[i].iHeadShotId )
+					spriteWidth += gHUD.GetSpriteRect(m_HUD_d_headshot).Width();
+				int totalWidth = killerLen + spriteWidth + victimLen + bgPadX * 3;
+
+				int bgX = ScreenWidth - totalWidth - bgPadX;
+				int bgY = y - bgPadY - 2;
+				int bgH = 24;
+
+				int bgR, bgG, bgB, bgA;
+				switch( rgDeathNoticeList[i].iDrawBg )
+				{
+				case 1:  bgR = 0; bgG = 80; bgB = 0; bgA = 120; break;   // green
+				case 2:  bgR = 80; bgG = 0; bgB = 0; bgA = 120; break;   // red
+				default: bgR = 20; bgG = 20; bgB = 20; bgA = 100; break;  // neutral
+				}
+
+				FillRGBA( bgX, bgY, totalWidth + bgPadX, bgH, bgR, bgG, bgB, bgA );
+			}
 			x = ScreenWidth - DrawUtils::ConsoleStringLen(rgDeathNoticeList[i].szVictim) - (gHUD.GetSpriteRect(id).Width());
 			if( rgDeathNoticeList[i].iHeadShotId )
 				x -= gHUD.GetSpriteRect(m_HUD_d_headshot).Width();
@@ -151,6 +183,42 @@ int CHudDeathNotice :: Draw( float flTime )
 
 	if( i == 0 )
 		m_iFlags &= ~HUD_DRAW; // disable hud item
+
+	// CSO HUD: Draw kill streak notification (center screen)
+	if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 && m_szStreakText[0] )
+	{
+		float elapsed = flTime - m_flStreakDisplayTime;
+		if( elapsed < 2.5f )
+		{
+			float alpha = 1.0f;
+			if( elapsed > 2.0f )
+				alpha = 1.0f - ( ( elapsed - 2.0f ) / 0.5f );
+
+			// Scale effect: starts big, settles to normal
+			float scaleEffect = 1.0f;
+			if( elapsed < 0.15f )
+				scaleEffect = 1.3f - ( elapsed / 0.15f ) * 0.3f;
+
+			int sa = (int)( 255 * alpha );
+			int sr = 255, sg = 220, sb = 50;
+			DrawUtils::ScaleColors( sr, sg, sb, sa );
+
+			int textLen = DrawUtils::HudStringLen( m_szStreakText );
+			int tx = ( ScreenWidth - textLen ) / 2;
+			int ty = ScreenHeight / 4;
+
+			// Background panel
+			FillRGBA( tx - 20, ty - 8, textLen + 40, 30, 0, 0, 0, (int)( 160 * alpha ) );
+			// Gold accent lines
+			FillRGBA( tx - 20, ty - 8, textLen + 40, 2, 255, 200, 50, (int)( 200 * alpha ) );
+			FillRGBA( tx - 20, ty + 22, textLen + 40, 2, 255, 200, 50, (int)( 200 * alpha ) );
+			DrawUtils::DrawHudString( tx, ty, ScreenWidth, m_szStreakText, sr, sg, sb );
+		}
+		else
+		{
+			m_szStreakText[0] = 0;
+		}
+	}
 
 	return 1;
 }
@@ -240,6 +308,54 @@ int CHudDeathNotice :: MsgFunc_DeathMsg( const char *pszName, int iSize, void *p
 	}
 
 	rgDeathNoticeList[i].iHeadShotId = headshot;
+
+	// CSO HUD: Determine background type based on local player
+	rgDeathNoticeList[i].iDrawBg = 0;
+	if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+	{
+		int localIdx = gEngfuncs.GetLocalPlayer()->index;
+
+		if( killer == localIdx && victim != localIdx )
+		{
+			rgDeathNoticeList[i].iDrawBg = 1;  // green — you killed
+
+			// Kill streak tracking
+			if( gHUD.m_flTime - m_flLastKillTime < 4.0f )
+				m_iKillStreak++;
+			else
+				m_iKillStreak = 1;
+
+			m_flLastKillTime = gHUD.m_flTime;
+
+			// Set streak text
+			switch( m_iKillStreak )
+			{
+			case 2: strncpy( m_szStreakText, "DOUBLE KILL!", sizeof(m_szStreakText) ); m_flStreakDisplayTime = gHUD.m_flTime; break;
+			case 3: strncpy( m_szStreakText, "TRIPLE KILL!", sizeof(m_szStreakText) ); m_flStreakDisplayTime = gHUD.m_flTime; break;
+			case 4: strncpy( m_szStreakText, "ULTRA KILL!", sizeof(m_szStreakText) ); m_flStreakDisplayTime = gHUD.m_flTime; break;
+			case 5: strncpy( m_szStreakText, "RAMPAGE!", sizeof(m_szStreakText) ); m_flStreakDisplayTime = gHUD.m_flTime; break;
+			default:
+				if( m_iKillStreak > 5 )
+				{
+					snprintf( m_szStreakText, sizeof(m_szStreakText), "%d KILL STREAK!", m_iKillStreak );
+					m_flStreakDisplayTime = gHUD.m_flTime;
+				}
+				break;
+			}
+
+			// Headshot notification
+			if( headshot && m_iKillStreak < 2 )
+			{
+				strncpy( m_szStreakText, "HEADSHOT!", sizeof(m_szStreakText) );
+				m_flStreakDisplayTime = gHUD.m_flTime;
+			}
+		}
+		else if( victim == localIdx )
+		{
+			rgDeathNoticeList[i].iDrawBg = 2;  // red — you died
+			m_iKillStreak = 0;  // reset streak on death
+		}
+	}
 
 	// Find the sprite in the list
 	int spr = gHUD.GetSpriteIndex( killedwith );

@@ -1112,6 +1112,63 @@ int CHudAmmo::Draw(float flTime)
 		int iOffset = (m_pWeapon->rcAmmo.Height())/8;
 		SPR_Set(m_pWeapon->hAmmo, r, g, b);
 		SPR_DrawAdditive(0, x, y - iOffset, &m_pWeapon->rcAmmo);
+
+		// CSO HUD: Draw ammo bar under the ammo numbers
+		if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 && pw->iClip >= 0 )
+		{
+			// Estimate max clip from weapon ID
+			int maxClip = 30; // default
+			switch( pw->iId )
+			{
+			case 1: maxClip = 13; break; // p228
+			case 3: maxClip = 10; break; // scout
+			case 4: maxClip = 1; break;  // hegrenade
+			case 5: maxClip = 7; break;  // xm1014
+			case 6: maxClip = 100; break; // c4
+			case 7: maxClip = 30; break; // mac10
+			case 8: maxClip = 30; break; // aug
+			case 9: maxClip = 1; break;  // smokegrenade
+			case 10: maxClip = 30; break; // elite
+			case 11: maxClip = 20; break; // fiveseven
+			case 12: maxClip = 25; break; // ump45
+			case 13: maxClip = 30; break; // sg550
+			case 14: maxClip = 35; break; // galil
+			case 15: maxClip = 25; break; // famas
+			case 16: maxClip = 12; break; // usp
+			case 17: maxClip = 20; break; // glock
+			case 18: maxClip = 10; break; // awp
+			case 19: maxClip = 30; break; // mp5
+			case 20: maxClip = 100; break; // m249
+			case 21: maxClip = 8; break;  // m3
+			case 22: maxClip = 30; break; // m4a1
+			case 23: maxClip = 30; break; // tmp
+			case 24: maxClip = 20; break; // g3sg1
+			case 25: maxClip = 1; break;  // flashbang
+			case 26: maxClip = 7; break;  // deagle
+			case 27: maxClip = 30; break; // sg552
+			case 28: maxClip = 30; break; // ak47
+			case 29: maxClip = 1; break;  // knife
+			case 30: maxClip = 50; break; // p90
+			default: maxClip = 30; break;
+			}
+
+			int barX = ScreenWidth - (8 * AmmoWidth) - (m_pWeapon->rcAmmo.Width());
+			int barY = y + gHUD.m_iFontHeight + 2;
+			int barWidth = 8 * AmmoWidth;
+			int barHeight = 9;
+
+			float ratio = (float)pw->iClip / (float)maxClip;
+			if( ratio > 1.0f ) ratio = 1.0f;
+			int fillWidth = (int)( barWidth * ratio );
+
+			int barR, barG, barB;
+			if( ratio > 0.3f ) { barR = 255; barG = 200; barB = 50; }  // yellow
+			else { barR = 255; barG = 50; barB = 50; }                  // red when low
+
+			FillRGBA( barX, barY, barWidth, barHeight, 40, 40, 40, 150 );
+			if( fillWidth > 0 )
+				FillRGBA( barX, barY, fillWidth, barHeight, barR, barG, barB, 180 );
+		}
 	}
 
 	// Does weapon have seconday ammo?

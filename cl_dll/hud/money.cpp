@@ -140,6 +140,23 @@ int CHudMoney::Draw(float flTime)
 
 	DrawUtils::DrawHudNumber2( x + iDollarWidth, y, false, 5, m_iMoneyCount, r, g, b );
 	FillRGBA(x + iDollarWidth / 4, y + gHUD.m_iFontHeight / 4, 2, 2, r, g, b, alphaBalance );
+
+	// CSO HUD: Draw money change indicator with background
+	if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 && m_iDelta != 0 && m_fFade > 0 )
+	{
+		int iDollarHeight = m_hDollar.rect.Height();
+		float deltaAlpha = m_fFade / 5.0f;
+		int da = (int)( 200 * deltaAlpha );
+
+		int bgR, bgG, bgB;
+		if( m_iDelta > 0 ) { bgR = 0; bgG = 60; bgB = 0; }
+		else { bgR = 60; bgG = 0; bgB = 0; }
+
+		// Background behind the delta display
+		int deltaY = y - iDollarHeight * 1.5;
+		FillRGBA( x - 2, deltaY - 2, iDollarWidth * 6, iDollarHeight + 4, bgR, bgG, bgB, da / 2 );
+	}
+
 	return 1;
 }
 

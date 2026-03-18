@@ -363,6 +363,32 @@ int CHudScoreboard :: DrawTeams( float list_slot )
 			Localize_StripIndices( fmtString );
 
 		GetTeamColor( r, g, b, team_info->teamnumber );
+
+		// CSO HUD: Draw team-colored header background
+		if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+		{
+			int bgR = 40, bgG = 40, bgB = 40;
+			switch( team_info->teamnumber )
+			{
+			case TEAM_TERRORIST: bgR = 120; bgG = 50; bgB = 30; break;
+			case TEAM_CT:        bgR = 30;  bgG = 50; bgB = 120; break;
+			}
+			FillRGBA( xstart + 1, ypos - 2, xend - xstart - 2, ROW_GAP + 2, bgR, bgG, bgB, 140 );
+
+			// Count alive players
+			int alive = 0;
+			for( int p = 1; p < MAX_PLAYERS; p++ )
+			{
+				if( g_PlayerInfoList[p].name && g_PlayerInfoList[p].name[0] &&
+				    !stricmp( g_PlayerExtraInfo[p].teamname, team_info->name ) &&
+				    !g_PlayerExtraInfo[p].dead )
+					alive++;
+			}
+			char aliveStr[32];
+			snprintf( aliveStr, sizeof(aliveStr), "%d alive", alive );
+			DrawUtils::DrawHudStringReverse( g_Columns[COL_DEATHS].start, ypos, g_Columns[COL_DEATHS].end, aliveStr, 200, 200, 200 );
+		}
+
 		switch ( team_info->teamnumber )
 		{
 		case TEAM_TERRORIST:
@@ -448,6 +474,13 @@ int CHudScoreboard :: DrawPlayers( float list_slot, int nameoffset, const char *
 		if(pl_info->thisplayer) // hey, it's me!
 		{
 			FillRGBABlend( xstart, ypos, xend - xstart, ROW_GAP, 255, 255, 255, 15 );
+		}
+		// CSO HUD: alternating row backgrounds
+		else if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+		{
+			int rowIdx = (int)list_slot;
+			if( rowIdx % 2 == 0 )
+				FillRGBABlend( xstart, ypos, xend - xstart, ROW_GAP, 255, 255, 255, 5 );
 		}
 
 		DrawUtils::DrawHudString( g_Columns[COL_NAME].start + nameoffset, ypos, g_Columns[COL_NAME].start + 350, pl_info->name, r, g, b );

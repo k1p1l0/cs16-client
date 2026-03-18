@@ -175,6 +175,12 @@ int CHudHealth:: MsgFunc_Damage(const char *pszName,  int iSize, void *pbuf )
 			if( time > 200.0f ) time = 200.0f;
 			gMobileAPI.pfnVibrate( time, 0 );
 		}
+
+		// CSO HUD: trigger hit marker and damage numbers when taking damage
+		if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 && damageTaken > 0 )
+		{
+			gHUD.m_HitMarker.TriggerHit( damageTaken );
+		}
 	}
 	return 1;
 }
@@ -262,6 +268,13 @@ int CHudHealth::Draw(float flTime)
 
 void CHudHealth::DrawHealthBar( float flTime )
 {
+	// CSO HUD style: draw bar instead of just numbers
+	if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+	{
+		DrawCSO_HealthBar( flTime );
+		return;
+	}
+
 	int r, g, b;
 	int a = 0, x, y;
 	int HealthWidth;
@@ -285,6 +298,82 @@ void CHudHealth::DrawHealthBar( float flTime )
 
 		x = DrawUtils::DrawHudNumber(x, y, DHN_3DIGITS | DHN_DRAWZERO, m_iHealth, r, g, b);
 	}
+}
+
+//
+// DrawCSO_HealthBar - CSO-style health with colored bar
+//
+// Layout (bottom-left):
+//   [Cross] [Number] [===Bar===]
+//
+// Bar color: green(>50) -> yellow(>25) -> red(<=25) with pulse
+//
+void CHudHealth::DrawCSO_HealthBar( float flTime )
+{
+	if( !(gHUD.m_iWeaponBits & (1<<(WEAPON_SUIT))) )
+		return;
+
+	int r, g, b;
+	int a = 255;
+
+	// Color based on health level
+	if( m_iHealth > 50 )
+	{
+		r = 0; g = 200; b = 0;
+	}
+	else if( m_iHealth > 25 )
+	{
+		r = 255; g = 200; b = 0;
+	}
+	else
+	{
+		r = 255; g = 50; b = 0;
+		// Pulse when critical
+		float pulse = sinf( flTime * 6.0f ) * 0.3f + 0.7f;
+		a = (int)( 255 * pulse );
+	}
+
+	int CrossWidth = gHUD.GetSpriteRect( m_HUD_cross ).right - gHUD.GetSpriteRect( m_HUD_cross ).left;
+	int y = ScreenHeight - gHUD.m_iFontHeight - gHUD.m_iFontHeight / 2;
+	int x = CrossWidth / 2;
+
+	// Draw cross sprite (white for modern look)
+	int cr = 255, cg = 255, cb = 255;
+	DrawUtils::ScaleColors( cr, cg, cb, a );
+	SPR_Set( gHUD.GetSprite( m_HUD_cross ), cr, cg, cb );
+	SPR_DrawAdditive( 0, x, y, &gHUD.GetSpriteRect( m_HUD_cross ) );
+
+	// Draw health number
+	int numR = r, numG = g, numB = b;
+	DrawUtils::ScaleColors( numR, numG, numB, a );
+	int HealthWidth = gHUD.GetSpriteRect( gHUD.m_HUD_number_0 ).Width();
+	x = CrossWidth + HealthWidth / 2;
+	int numEndX = DrawUtils::DrawHudNumber( x, y, DHN_3DIGITS | DHN_DRAWZERO, m_iHealth, numR, numG, numB );
+
+	// Draw health bar
+	int barX = numEndX + HealthWidth / 2;
+	int barWidth = CSO_BAR_WIDTH;
+	int barHeight = gHUD.m_iFontHeight;
+	if( barHeight < 14 ) barHeight = 14;
+	int barY = y + ( gHUD.m_iFontHeight - barHeight ) / 2;
+
+	float ratio = 0.0f;
+	if( m_iHealth > 0 )
+		ratio = (float)m_iHealth / 100.0f;
+	if( ratio > 1.0f ) ratio = 1.0f;
+
+	int fillWidth = (int)( barWidth * ratio );
+
+	// Background
+	FillRGBA( barX, barY, barWidth, barHeight, 40, 40, 40, 180 );
+	// Fill
+	if( fillWidth > 0 )
+		FillRGBA( barX, barY, fillWidth, barHeight, r, g, b, a > 200 ? 200 : a );
+	// Border
+	FillRGBA( barX, barY, barWidth, 1, r/2, g/2, b/2, a/2 );
+	FillRGBA( barX, barY + barHeight - 1, barWidth, 1, r/2, g/2, b/2, a/2 );
+	FillRGBA( barX, barY, 1, barHeight, r/2, g/2, b/2, a/2 );
+	FillRGBA( barX + barWidth - 1, barY, 1, barHeight, r/2, g/2, b/2, a/2 );
 }
 
 void CHudHealth::CalcDamageDirection( Vector vecFrom )

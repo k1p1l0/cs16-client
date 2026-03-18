@@ -325,6 +325,20 @@ void CHud :: Init( void )
 	// The cvar was taken from the OpenAG client
 	m_pCvarColor = CVAR_CREATE( "hud_color", "255 160 0", FCVAR_ARCHIVE );
 
+	// CSO HUD style: 0 = classic CS 1.6, 1 = modern bars + backgrounds
+	m_hudstyle = CVAR_CREATE( "hud_style", "1", FCVAR_ARCHIVE );
+
+	// CSO HUD: Use HUD font for chat instead of tiny console bitmap font
+	gEngfuncs.Cvar_SetValue( "hud_textmode", 1.0f );
+
+	// Hide engine version watermark
+	gEngfuncs.Cvar_SetValue( "cl_draw_version", 0.0f );
+	gEngfuncs.pfnClientCmd( "cl_draw_version 0" );
+
+	// Cyrillic support (Russian/Ukrainian): UTF-8 input → CP1251 rendering
+	gEngfuncs.pfnClientCmd( "cl_charset utf-8" );
+	gEngfuncs.pfnClientCmd( "con_charset cp1251" );
+
 	if ( gEngfuncs.pfnGetCvarFloat( "developer" ) > 0.0f )
 	{
 		cl_fog_density = CVAR_CREATE( "cl_fog_density", "0", 0 );
@@ -388,6 +402,10 @@ void CHud :: Init( void )
 	m_DeathNotice.Init();
 	m_TextMessage.Init();
 	m_MOTD.Init();
+
+	// CSO HUD effects
+	m_HitMarker.Init();
+	m_DamageNumbers.Init();
 
 	// all things that have own background and must be drawn last
 	m_ProgressBar.Init();

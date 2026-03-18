@@ -107,14 +107,23 @@ int CHudMenu :: Draw( float flTime )
 	}
 
 	// center it
-	int y = (ScreenHeight/2) - ((nlc/2)*12) - 40; // make sure it is above the say text
+	int lineSpacing = ( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 ) ? 28 : 24;
+	int y = (ScreenHeight/2) - ((nlc/2)*lineSpacing/2) - 40;
 	int x = 20;
+
+	// CSO HUD: Draw dark background panel behind menu
+	if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+	{
+		int bgH = (nlc + 1) * lineSpacing + 20;
+		FillRGBA( x - 10, y - 10, 360, bgH, 5, 5, 10, 200 );
+		FillRGBA( x - 10, y - 10, 3, bgH, 50, 130, 255, 240 );
+	}
 
 	i = 0;
 	while ( i < MAX_MENU_STRING && g_szMenuString[i] != '\0' )
 	{
-		DrawUtils::DrawHudString( x, y, 320, g_szMenuString + i, 255, 255, 255 );
-		y += 24;
+		DrawUtils::DrawHudString( x, y, 450, g_szMenuString + i, 255, 255, 255 );
+		y += lineSpacing;
 
 		while ( i < MAX_MENU_STRING && g_szMenuString[i] != '\0' && g_szMenuString[i] != '\n' )
 			i++;

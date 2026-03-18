@@ -121,12 +121,51 @@ int CHudSayText :: Draw( float flTime )
 		}
 	}
 	
+	// CSO HUD: Draw translucent background panel behind all chat lines
+	if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+	{
+		// Count active lines
+		int activeLines = 0;
+		for( int j = 0; j < MAX_LINES; j++ )
+		{
+			if( g_szLineBuffer[j][0] )
+				activeLines++;
+		}
+
+		// Calculate actual line height used for drawing
+		int chatLineH = line_height + 4;
+
+		if( activeLines > 0 )
+		{
+			// Calculate max text width across all lines for tight background
+			int maxTextW = 0;
+			for( int j = 0; j < MAX_LINES; j++ )
+			{
+				if( g_szLineBuffer[j][0] )
+				{
+					int tw = DrawUtils::ConsoleStringLen( g_szLineBuffer[j] );
+					if( tw > maxTextW ) maxTextW = tw;
+				}
+			}
+
+			int bgX = 0;
+			int bgY = y - 6;
+			int bgW = maxTextW + 30;  // tight to text width + padding
+			if( bgW > ScreenWidth / 2 ) bgW = ScreenWidth / 2;  // cap at half screen
+			int bgH = activeLines * chatLineH + 12;
+			// Dark solid background
+			FillRGBA( bgX, bgY, bgW, bgH, 5, 5, 10, 210 );
+			// Left accent bar
+			FillRGBA( bgX, bgY, 3, bgH, 50, 130, 255, 240 );
+		}
+	}
+
 	for (int i = 0; i < MAX_LINES; i++)
 	{
 		if (!g_szLineBuffer[i][0]) // skip empty string
 			continue;
 
-		int current_x = LINE_START;
+		int current_x = ( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 ) ? 15 : LINE_START;
 		const char* text = g_szLineBuffer[i];
 		size_t length = strlen(text);
 
@@ -185,7 +224,11 @@ int CHudSayText :: Draw( float flTime )
 			DrawUtils::DrawConsoleString(current_x, y, color_buffer);
 		}
 
-		y += line_height;
+		// CSO HUD: slightly more line spacing
+		if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+			y += line_height + 4;
+		else
+			y += line_height;
 	}
 	
 	return 1;

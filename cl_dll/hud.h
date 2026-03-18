@@ -26,6 +26,9 @@
 #define RGB_GREENISH 0x0000A000 //0,160,0
 #define RGB_WHITE 0x00FFFFFF
 #define RGB_GRAY 0x00808080
+#define RGB_LIGHTBLUE 0x0050A0FF //80,160,255
+
+#define CSO_BAR_WIDTH 210
 
 #include <assert.h>
 #include <string.h>
@@ -497,10 +500,58 @@ public:
 	int Draw( float flTime );
 	CHudMsgFunc(DeathMsg);
 
+	// CSO: kill streak tracking
+	int m_iKillStreak;
+	float m_flLastKillTime;
+	float m_flStreakDisplayTime;
+	char m_szStreakText[32];
+
 private:
 	int m_HUD_d_skull;  // sprite index of skull icon
 	int m_HUD_d_headshot;
 	cvar_t *hud_deathnotice_time;
+};
+
+//
+//-----------------------------------------------------
+//
+// CSO HUD: Hit marker overlay
+class CHudHitMarker : public CHudBase
+{
+public:
+	int Init( void );
+	int VidInit( void );
+	int Draw( float flTime );
+	void TriggerHit( int damage );
+
+	float m_flHitTime;   // time of last hit
+	int m_iHitDamage;    // damage dealt
+};
+
+//
+//-----------------------------------------------------
+//
+// CSO HUD: Floating damage numbers
+#define MAX_DAMAGE_NUMBERS 8
+struct DamageNumber
+{
+	float x, y;
+	int damage;
+	float flTime;
+	bool headshot;
+};
+
+class CHudDamageNumbers : public CHudBase
+{
+public:
+	int Init( void );
+	int VidInit( void );
+	int Draw( float flTime );
+	void AddDamage( int damage, float x, float y, bool headshot );
+
+private:
+	DamageNumber m_numbers[MAX_DAMAGE_NUMBERS];
+	int m_iNext;
 };
 
 //
@@ -571,8 +622,10 @@ public:
 	int Draw(float flTime);
 	CHudMsgFunc(Battery);
 	CHudMsgFunc(ArmorType);
-	
+
 private:
+	void DrawCSO_ArmorBar( float flTime );
+
 	enum armortype_t {
 		Vest = 0,
 		VestHelm
@@ -1029,6 +1082,7 @@ public:
 	cvar_t *cl_viewbob;
 
 	cvar_t* m_pCvarColor;
+	cvar_t* m_hudstyle; // CSO HUD style: 0=classic, 1=modern bars
 	unsigned long m_iDefaultHUDColor;
 	void UpdateDefaultHUDColor();
 
@@ -1061,6 +1115,8 @@ public:
 	CHudRadar       m_Radar;
 	CHudSpectatorGui m_SpectatorGui;
 	CHudScenario	m_Scenario;
+	CHudHitMarker   m_HitMarker;
+	CHudDamageNumbers m_DamageNumbers;
 
 	// user messages
 	CHudMsgFunc(Damage);

@@ -111,6 +111,30 @@ int CHudTimer::Draw( float fTime )
 
 	m_right = DrawUtils::DrawHudNumber2(x, y, true, 2, seconds, r, g, b);
 
+	// CSO HUD: Draw timer bar under the clock
+	if( gHUD.m_hudstyle && gHUD.m_hudstyle->value >= 1 )
+	{
+		int timeLeft = max( 0, (int)( m_iTime + m_fStartTime - gHUD.m_flTime ) );
+		float ratio = ( m_iTime > 0 ) ? (float)timeLeft / (float)m_iTime : 0.0f;
+		if( ratio > 1.0f ) ratio = 1.0f;
+
+		int barWidth = totalWidth;
+		int barHeight = 8;
+		int barX = (ScreenWidth - barWidth) / 2;
+		int barY = y + gHUD.m_iFontHeight + 2;
+
+		int fillWidth = (int)( barWidth * ratio );
+
+		int barR, barG, barB;
+		if( timeLeft > 20 ) { barR = 0; barG = 180; barB = 0; }       // green
+		else if( timeLeft > 10 ) { barR = 255; barG = 200; barB = 0; } // yellow
+		else { barR = 255; barG = 50; barB = 0; }                       // red
+
+		FillRGBA( barX, barY, barWidth, barHeight, 40, 40, 40, 150 );
+		if( fillWidth > 0 )
+			FillRGBA( barX, barY, fillWidth, barHeight, barR, barG, barB, 200 );
+	}
+
 	return 1;
 }
 
